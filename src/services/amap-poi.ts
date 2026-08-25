@@ -168,6 +168,15 @@ function flattenDistricts(districts: AmapDistrict[]): AmapDistrict[] {
   return districts.flatMap(district => [district, ...flattenDistricts(district.districts || [])])
 }
 
+function districtSearchRank(district: AmapDistrict, query: string) {
+  const name = String(district.name || '')
+  const displayName = cityDisplayName(name)
+  const exactRank = displayName === query ? 0 : name.startsWith(query) ? 1 : 2
+  const levelRank = district.level === 'city' ? 0 : district.level === 'district' ? 1 : 2
+  const suffixRank = name.endsWith('市') ? 0 : name.endsWith('县') || name.endsWith('区') ? 2 : 1
+  return exactRank * 100 + levelRank * 10 + suffixRank
+}
+
 async function requestCityProfile(city: string) {
   const response = await uni.request({
     url: 'https://restapi.amap.com/v5/place/text',
@@ -205,11 +214,13 @@ export async function searchAmapCities(keyword: string): Promise<CitySearchResul
   const body = response.data as AmapDistrictResponse
   if (body.status !== '1') throw new Error(body.info || '城市搜索失败')
   const query = keyword.trim()
-  const candidates = flattenDistricts(body.districts || [])
+  const relatedCandidates = flattenDistricts(body.districts || [])
     .filter(item => item.adcode && item.name && ['province', 'city', 'district'].includes(String(item.level)))
     .filter(item => String(item.name).includes(query) || cityDisplayName(String(item.name)).includes(query))
     .filter((item, index, items) => items.findIndex(other => other.adcode === item.adcode) === index)
-    .slice(0, 8)
+    .sort((left, right) => districtSearchRank(left, query) - districtSearchRank(right, query))
+  const exactCandidates = relatedCandidates.filter(item => cityDisplayName(String(item.name)) === query)
+  const candidates = (exactCandidates.length ? exactCandidates : relatedCandidates).slice(0, 8)
 
   const results = await Promise.all(candidates.map(async (district) => {
     const city = cityDisplayName(String(district.name))
