@@ -1,0 +1,19 @@
+{
+  "pages": [
+    {
+      "path": "pages/index/index",
+      "style": {
+        "navigationBarTitleText": "途屿",
+        "navigationStyle": "custom",
+        "backgroundColor": "#F4F7F8",
+        "enablePullDownRefresh": false
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "途屿",
+    "navigationBarBackgroundColor": "#F7FAFF",
+    "backgroundColor": "#F4F7F8"
+  }
+}

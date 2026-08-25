@@ -1,0 +1,28 @@
+{
+  "name": "途屿",
+  "appid": "__UNI__TRAVEL_PLANNER",
+  "description": "旅行行程规划小程序",
+  "versionName": "1.0.0",
+  "versionCode": "100",
+  "transformPx": false,
+  "mp-weixin": {
+    "appid": "wx183e86f9de770b5a",
+    "setting": {
+      "urlCheck": false,
+      "minified": true,
+      "uploadWithSourceMap": false,
+      "minifyWXSS": true,
+      "minifyWXML": true
+    },
+    "permission": {
+      "scope.userLocation": {
+        "desc": "用于在行程地图中显示当前位置和附近路线"
+      }
+    },
+    "usingComponents": true
+  },
+  "vueVersion": "3",
+  "uniStatistics": {
+    "enable": false
+  }
+}
