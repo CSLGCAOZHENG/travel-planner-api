@@ -1,17 +1,18 @@
 import express from 'express'
 import cors from 'cors'
-import mysql from 'mysql2/promise'
+import pg from 'pg'
+const { Pool } = pg
 
 const app = express()
 const port = Number(process.env.PORT || 3000)
-const pool = process.env.DB_HOST ? mysql.createPool({
+const pool = process.env.DB_HOST ? new Pool({
   host: process.env.DB_HOST,
   port: Number(process.env.DB_PORT || 3306),
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
-  waitForConnections: true,
-  connectionLimit: 5
+  max: 5,
+  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined
 }) : null
 
 app.use(cors())
@@ -46,25 +47,25 @@ app.post('/api/auth/wechat-login', async (req, res) => {
   })
   const result = await fetch(url).then(response => response.json())
   if (!result.openid) return res.status(401).json({ message: result.errmsg || '微信登录失败' })
-  if (pool) await pool.execute('INSERT INTO users (openid) VALUES (?) ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP', [result.openid])
+  if (pool) await pool.query('INSERT INTO users (openid) VALUES ($1) ON CONFLICT (openid) DO UPDATE SET updated_at = NOW()', [result.openid])
   res.json({ openid: result.openid })
 })
 
 app.get('/api/trips', requireOpenid, async (req, res) => {
   if (!pool) return res.json([])
-  const [rows] = await pool.execute('SELECT id, payload, updated_at AS updatedAt FROM trips WHERE openid = ? ORDER BY updated_at DESC', [req.openid])
-  res.json(rows.map(row => ({ ...JSON.parse(row.payload), updatedAt: row.updatedAt })))
+  const { rows } = await pool.query('SELECT id, payload, updated_at AS "updatedAt" FROM trips WHERE openid = $1 ORDER BY updated_at DESC', [req.openid])
+  res.json(rows.map(row => ({ ...row.payload, updatedAt: row.updatedAt })))
 })
 
 app.put('/api/trips/:id', requireOpenid, async (req, res) => {
   if (!pool) return res.status(503).json({ message: '数据库尚未配置' })
   const payload = JSON.stringify(req.body || {})
-  await pool.execute('INSERT INTO trips (id, openid, payload) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE payload = VALUES(payload), updated_at = CURRENT_TIMESTAMP', [req.params.id, req.openid, payload])
+  await pool.query('INSERT INTO trips (id, openid, payload) VALUES ($1, $2, $3::jsonb) ON CONFLICT (id) DO UPDATE SET openid = EXCLUDED.openid, payload = EXCLUDED.payload, updated_at = NOW()', [req.params.id, req.openid, payload])
   res.json({ ok: true })
 })
 
 app.delete('/api/trips/:id', requireOpenid, async (req, res) => {
-  if (pool) await pool.execute('DELETE FROM trips WHERE id = ? AND openid = ?', [req.params.id, req.openid])
+  if (pool) await pool.query('DELETE FROM trips WHERE id = $1 AND openid = $2', [req.params.id, req.openid])
   res.json({ ok: true })
 })
 

@@ -29,7 +29,7 @@ DB_PASSWORD=数据库密码
 
 ## 数据库
 
-创建 MySQL 数据库后执行 `schema.sql`。部署完成后访问：
+当前环境使用 PostgreSQL。已在 `public` Schema 创建 `users`、`trips` 表。云托管环境变量使用 PostgreSQL 连接信息，并增加 `DB_SSL=true`（如控制台要求 SSL）。部署完成后访问：
 
 ```text
 https://云托管服务域名/health
