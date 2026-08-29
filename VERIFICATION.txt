@@ -1,0 +1,23 @@
+Changed branch: CloudBase SDK authentication
+Changed field: cloudbase.init.accessKey = process.env.CLOUDBASE_APIKEY
+MODIFIED_FILE: server/src/index.js
+DIFF_FILE: DIFF_FILE
+VERIFICATION.txt: VERIFICATION.txt
+ROLLBACK.sh: ROLLBACK.sh
+
+BASELINE command: git show HEAD^:server/src/index.js | node --check --input-type=module
+BASELINE literal output/result: (no output)
+BASELINE exit status: 0
+
+MODIFIED command: node --check server/src/index.js
+MODIFIED literal output/result: (no output)
+MODIFIED exit status: 0
+
+ROLLBACK command: sh ROLLBACK.sh rollback-copy.js
+ROLLBACK literal output/result: restored rollback-copy.js from HEAD^ source
+ROLLBACK exit status: 0
+Restored behavior/status: rollback copy matches baseline source; working tree leaves MODIFIED_FILE changed.
+
+Online command: Invoke-WebRequest https://travel-planner-api-304867-11-1300372999.sh.run.tcloudbase.com/health
+Online literal output/result: HTTP 502 Bad Gateway
+Online status: pending console save/update to inject CLOUDBASE_APIKEY and deploy commit 04bc8bd.

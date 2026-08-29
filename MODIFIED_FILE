@@ -1,0 +1,4 @@
+server/src/index.js
+
+Changed branch: CloudBase SDK authentication.
+Changed field: cloudbase.init.accessKey = process.env.CLOUDBASE_APIKEY
