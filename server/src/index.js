@@ -1,19 +1,15 @@
 import express from 'express'
 import cors from 'cors'
-import pg from 'pg'
-const { Pool } = pg
+import cloudbase from '@cloudbase/node-sdk'
 
 const app = express()
 const port = Number(process.env.PORT || 3000)
-const pool = process.env.DB_HOST ? new Pool({
-  host: process.env.DB_HOST,
-  port: Number(process.env.DB_PORT || 3306),
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  max: 5,
-  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined
-}) : null
+const cloudApp = cloudbase.init({
+  env: process.env.TCB_ENV_ID || process.env.CLOUDBASE_ENV_ID || 'ty01-d3gu33xur9acdf9d4',
+  secretId: process.env.TCB_SECRET_ID,
+  secretKey: process.env.TCB_SECRET_KEY
+})
+const db = cloudApp.database()
 
 app.use(cors())
 app.use(express.json({ limit: '2mb' }))
@@ -26,10 +22,8 @@ function requireOpenid(req, res, next) {
 }
 
 app.get('/health', async (_req, res) => {
-  let database = 'not-configured'
-  if (pool) {
-    try { await pool.query('SELECT 1'); database = 'ok' } catch { database = 'error' }
-  }
+  let database = 'error'
+  try { await db.collection('trips').limit(1).get(); database = 'ok' } catch { database = 'not-configured' }
   res.json({ ok: true, service: 'travel-planner', database })
 })
 
@@ -47,25 +41,30 @@ app.post('/api/auth/wechat-login', async (req, res) => {
   })
   const result = await fetch(url).then(response => response.json())
   if (!result.openid) return res.status(401).json({ message: result.errmsg || '微信登录失败' })
-  if (pool) await pool.query('INSERT INTO users (openid) VALUES ($1) ON CONFLICT (openid) DO UPDATE SET updated_at = NOW()', [result.openid])
+  const userCollection = db.collection('users')
+  const existing = await userCollection.where({ openid: result.openid }).limit(1).get()
+  if (!existing.data.length) await userCollection.add({ openid: result.openid, createdAt: db.serverDate(), updatedAt: db.serverDate() })
   res.json({ openid: result.openid })
 })
 
 app.get('/api/trips', requireOpenid, async (req, res) => {
-  if (!pool) return res.json([])
-  const { rows } = await pool.query('SELECT id, payload, updated_at AS "updatedAt" FROM trips WHERE openid = $1 ORDER BY updated_at DESC', [req.openid])
-  res.json(rows.map(row => ({ ...row.payload, updatedAt: row.updatedAt })))
+  const result = await db.collection('trips').where({ openid: req.openid }).orderBy('updatedAt', 'desc').get()
+  res.json(result.data.map(row => ({ ...row.payload, id: row.id, updatedAt: row.updatedAt })))
 })
 
 app.put('/api/trips/:id', requireOpenid, async (req, res) => {
-  if (!pool) return res.status(503).json({ message: '数据库尚未配置' })
-  const payload = JSON.stringify(req.body || {})
-  await pool.query('INSERT INTO trips (id, openid, payload) VALUES ($1, $2, $3::jsonb) ON CONFLICT (id) DO UPDATE SET openid = EXCLUDED.openid, payload = EXCLUDED.payload, updated_at = NOW()', [req.params.id, req.openid, payload])
+  const payload = req.body || {}
+  const collection = db.collection('trips')
+  const existing = await collection.where({ id: req.params.id, openid: req.openid }).limit(1).get()
+  const doc = { id: req.params.id, openid: req.openid, payload, updatedAt: db.serverDate() }
+  if (existing.data.length) await collection.doc(existing.data[0]._id).update(doc)
+  else await collection.add({ ...doc, createdAt: db.serverDate() })
   res.json({ ok: true })
 })
 
 app.delete('/api/trips/:id', requireOpenid, async (req, res) => {
-  if (pool) await pool.query('DELETE FROM trips WHERE id = $1 AND openid = $2', [req.params.id, req.openid])
+  const existing = await db.collection('trips').where({ id: req.params.id, openid: req.openid }).limit(1).get()
+  if (existing.data.length) await db.collection('trips').doc(existing.data[0]._id).remove()
   res.json({ ok: true })
 })
 
