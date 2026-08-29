@@ -6,6 +6,7 @@ const app = express()
 const port = Number(process.env.PORT || 3000)
 const cloudApp = cloudbase.init({
   env: process.env.TCB_ENV_ID || process.env.CLOUDBASE_ENV_ID || 'ty01-d3gu33xur9acdf9d4',
+  accessKey: process.env.CLOUDBASE_APIKEY,
   secretId: process.env.TCB_SECRET_ID,
   secretKey: process.env.TCB_SECRET_KEY
 })
